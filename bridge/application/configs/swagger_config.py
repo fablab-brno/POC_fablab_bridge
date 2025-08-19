@@ -118,43 +118,7 @@ training_urls_outputs = {
 
 training_urls_schema = {
     "tags": [
-        "training-urls"
-    ],
-    "parameters": [
-        {
-            "name": "body",
-            "in": "body",
-            "type": "object",
-            "required": True,
-            "schema": {
-                "$ref": "#/definitions/TrainingURLSInputs"
-            }
-        }
-    ],
-    "consumes": [
-        TYPE_JSON
-    ],
-    "produces": [
-        TYPE_JSON
-    ],
-    "deprecated": False,
-    "definitions": {
-        "TrainingURLSInputs": training_urls_inputs,
-        "TrainingURLSOuputs": training_urls_outputs
-    },
-    "responses": {
-        "200": {
-            "description": "Full URL for online course",
-            "schema": {
-                "$ref": "#definitions/TrainingURLSOuputs"
-            }
-        }
-    }
-}
-
-expiration_schema = {
-    "tags": [
-        "training-expiration"
+        "MemberTrainingsData"
     ],
     "parameters": [
         {
@@ -190,7 +154,7 @@ expiration_schema = {
 
 absolved_trainings_schema = {
     "tags": [
-        "absolved-trainings"
+        "MemberTrainingsData"
     ],
     "parameters": [
         {
@@ -328,7 +292,7 @@ absolved_trainings_schema = {
 
 available_trainings_schema = {
     "tags": [
-        "available-trainings"
+        "MemberTrainingsData"
     ],
     "parameters": [
         {
@@ -355,9 +319,76 @@ available_trainings_schema = {
     }
 }
 
+absolve_training_again_schema = {
+    "tags": [
+        "AddTraining"
+    ],
+    "parameters": [
+        {
+            "name": "body",
+            "in": "body",
+            "type": "object",
+            "required": True,
+            "schema": {
+                "$ref": "#/definitions/AbsolveTrainingAgainInputs"
+            }
+        }
+    ],
+    "consumes": [
+        TYPE_JSON
+    ],
+    "produces": [
+        TYPE_JSON
+    ],
+    "deprecated": False,
+    "definitions": {
+        "AbsolveTrainingAgainInputs": {
+            "type": "object",
+            "required": [
+                "member_id",
+                "training_id"
+            ],
+            "properties": {
+                "member_id": {
+                    "type": "integer",
+                    "description": "Member ID from Fabman"
+                },
+                "training_id": {
+                    "type": "integer",
+                    "description": "Training-course ID from Fabman"
+                }
+            },
+            "example": {
+                "member_id": 123456,
+                "training_id": 1234
+            }
+        },
+        "AbsolveTrainingAgainOutputs": {
+            "type": "object",
+            "properties": {
+                "cm_url": {
+                    "type": "string",
+                    "description": "Full URL to ClassMarker quiz"
+                }
+            },
+            "example": {
+                "cm_url": "https://www.classmarker.com/online-test/start/?quiz=XXX&cm_user_id=encrypted<membed_id-training_id>"
+            }
+        }
+    },
+    "responses": {
+        "200": {
+            "description": "ClassMarker quiz URL for retaking the training",
+            "schema": {
+                "$ref": "#/definitions/AbsolveTrainingAgainOutputs"
+            }
+        }
+    }
+}
+
 cm_quiz_hook_schema = {
     "tags": [
-        "add-training"
+        "AddTraining"
     ],
     "parameters": [
         {
@@ -514,6 +545,104 @@ cm_quiz_hook_schema = {
             "schema": {
                 "type": "string",
                 "example": "Training passed, updated in Fabman"
+            }
+        }
+    }
+}
+
+expiration_schema = {
+    "tags": [
+        "SchedulersRequests"
+    ],
+    "parameters": [
+        {
+            "name": "body",
+            "in": "body",
+            "type": "object",
+            "required": True,
+            "schema": {
+                "$ref": "#/definitions/TrainingURLSInputs"
+            }
+        }
+    ],
+    "consumes": [
+        TYPE_JSON
+    ],
+    "produces": [
+        TYPE_JSON
+    ],
+    "deprecated": False,
+    "definitions": {
+        "TrainingURLSInputs": training_urls_inputs,
+        "TrainingURLSOuputs": training_urls_outputs
+    },
+    "responses": {
+        "200": {
+            "description": "Full URL for online course",
+            "schema": {
+                "$ref": "#definitions/TrainingURLSOuputs"
+            }
+        }
+    }
+}
+
+locked_booking_schema = {
+    "tags": [
+        "SchedulersRequests"
+    ],
+    "parameters": [
+        {
+            "name": "body",
+            "in": "body",
+            "type": "object",
+            "required": True,
+            "schema": {
+                "$ref": "#/definitions/LockedBookingInputs"
+            }
+        }
+    ],
+    "consumes": [
+        TYPE_JSON
+    ],
+    "produces": [
+        TYPE_JSON
+    ],
+    "deprecated": False,
+    "definitions": {
+        "LockedBookingInputs": {
+            "type": "object",
+            "required": [
+                "member_id",
+                "member_email",
+                "resource"
+            ],
+            "properties": {
+                "member_id": {
+                    "type": "integer",
+                    "description": "Member ID from Fabman"
+                },
+                "member_email": {
+                    "type": "string",
+                    "description": "Email address of the member"
+                },
+                "resource": {
+                    "type": "string",
+                    "description": "Name of the locked resource"
+                }
+            },
+            "example": {
+                "member_id": 123456,
+                "member_email": "user@example.com",
+                "resource": "Example Resource"
+            }
+        }
+    },
+    "responses": {
+        "200": {
+            "description": "Notification sent successfully",
+            "schema": {
+                "type": "string",
+                "example": ""
             }
         }
     }

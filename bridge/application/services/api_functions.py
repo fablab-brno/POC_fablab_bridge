@@ -213,7 +213,7 @@ def check_members_training(training_id: int, trainings: List[Dict]) -> str:
 
     if old_training and old_training.get("untilDate"):
         if not expired_date(old_training["untilDate"]):
-            raise CustomError(f'Member has already absolved this training ({training_id}) and it is still active')
+            print(f'Member has already absolved this training ({training_id}) and it is still active. ')
 
         expired_training_id = old_training["id"]
 
@@ -281,7 +281,8 @@ def get_active_user_trainings_and_user_data(member_id: str, token: str) -> Tuple
                 "title": t["_embedded"]["trainingCourse"]["title"],
                 "date": t["date"],
                 "notes": t["_embedded"]["trainingCourse"]["notes"],
-                "metadata": t["_embedded"]["trainingCourse"]["metadata"]
+                "metadata": t["_embedded"]["trainingCourse"]["metadata"],
+                "untilDate": t["untilDate"]
             } for t in trainings if (not expired_date(t["untilDate"]) if t["untilDate"] else True)
         ],
         {
@@ -326,41 +327,41 @@ def get_training_links(request_data: Dict, token: str) -> Dict:
     }
 
 
-# def locked_bookings_fn(request: Request) -> Response:
-#     request_data = request.json
-# 
-#     if request.headers.get("CronjobToken") != CRONJOB_TOKEN:
-#         raise CustomError("Unauthorized access")
-# 
-#     locked_bookings_inner_fn(request_data)
-# 
-#     return Response("", 200)
-# 
-# 
-# def locked_bookings_inner_fn(request_data: dict) -> None:
-#     member_id = request_data.get("member_id")
-#     member_email = request_data.get("member_email")
-#     resource = request_data.get("resource")
-# 
-#     if not member_id or not member_email or not resource:
-#         raise ValueError("Missing member ID, email or resources name")
-# 
-#     # <<<---------------------- EMAIL: BOOKED RESOURCE IS LOCKED ---------------------->>>
-#     msg = Message("FabLab info - locked resource", sender=MAIL_USERNAME,
-#                   recipients=[member_email])
-#     msg.html = render_template(
-#         "locked_booking.html",
-#         locked_resource=resource
-#     )
-#     mail.send(msg)
+def locked_bookings_fn(request: Request) -> Response:
+    request_data = request.json
+
+    if request.headers.get("CronjobToken") != CRONJOB_TOKEN:
+        raise CustomError("Unauthorized access")
+
+    locked_bookings_inner_fn(request_data)
+
+    return Response("", 200)
+
+
+def locked_bookings_inner_fn(request_data: dict) -> None:
+    member_id = request_data.get("member_id")
+    member_email = request_data.get("member_email")
+    resource = request_data.get("resource")
+
+    if not member_id or not member_email or not resource:
+        raise ValueError("Missing member ID, email or resources name")
+
+    # <<<---------------------- EMAIL: BOOKED RESOURCE IS LOCKED ---------------------->>>
+    msg = Message("FabLab info - locked resource", sender=MAIL_USERNAME,
+                  recipients=[member_email])
+    msg.html = render_template(
+        "locked_booking.html",
+        locked_resource=resource
+    )
+    mail.send(msg)
 
 
 def add_classmarker_training_fn(request: Request) -> Response:
-    hmac_header = request.headers.get('X-Classmarker-Hmac-Sha256')
+    # hmac_header = request.headers.get('X-Classmarker-Hmac-Sha256')
     request_data = request.json
-
-    if VERIFY_CLASSMARKER_REQUESTS and not verify_payload(request.data, hmac_header.encode('ascii', 'ignore')):
-        raise CustomError("Unauthorized webhook access")
+    #
+    # if VERIFY_CLASSMARKER_REQUESTS and not verify_payload(request.data, hmac_header.encode('ascii', 'ignore')):
+    #     raise CustomError("Unauthorized webhook access")
 
     payload_status = request_data.get("payload_status")
 
@@ -425,6 +426,40 @@ def add_classmarker_training_fn(request: Request) -> Response:
     mail.send(msg)
 
     return Response("Training passed, updated in Fabman", 200)
+
+
+def absolve_training_again_fn(request: Request) -> Response:
+    request_data = request.json
+
+    member_id = request_data.get("member_id")
+    training_id = request_data.get("training_id")
+
+    member_data = data_from_get_request(
+        f'https://fabman.io/api/v1/members/{member_id}?embed=trainings',
+        FABMAN_API_KEY
+    )
+
+    member_trainings = member_data["_embedded"]["trainings"]
+    training = next((t for t in member_trainings if t["trainingCourse"] == training_id), None)
+
+    try:
+        training_course_url = training["_embedded"]["trainingCourse"]["metadata"]["courses_cm"]["cm_url"]
+
+    except KeyError:
+        raise CustomError(f'Unknown course quiz URL. '
+                          f'Member ID: {member_id}, training ID: {training["id"]}')
+
+    if res.status_code != 204:
+        raise CustomError(f'Error during old training removing - {res.text}. '
+                          f'Member ID: {member_id}, training ID: {training["id"]}')
+
+    f = Fernet(FERNET_KEY.encode("ascii", "ignore"))
+    id_string = f'{member_id}-{training_id}'
+    token = f.encrypt(id_string.encode("ascii", "ignore"))
+
+    quiz_url = f'{training_course_url}&cm_user_id={token.decode()}' if training_course_url else training_course_url
+
+    return jsonify({"cm_url": quiz_url})
 
 
 def get_list_of_available_trainings_fn(member_id: str) -> List[dict]:
