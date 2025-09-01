@@ -357,11 +357,11 @@ def locked_bookings_inner_fn(request_data: dict) -> None:
 
 
 def add_classmarker_training_fn(request: Request) -> Response:
-    # hmac_header = request.headers.get('X-Classmarker-Hmac-Sha256')
+    hmac_header = request.headers.get('X-Classmarker-Hmac-Sha256')
     request_data = request.json
-    #
-    # if VERIFY_CLASSMARKER_REQUESTS and not verify_payload(request.data, hmac_header.encode('ascii', 'ignore')):
-    #     raise CustomError("Unauthorized webhook access")
+    
+    if VERIFY_CLASSMARKER_REQUESTS and not verify_payload(request.data, hmac_header.encode('ascii', 'ignore')):
+        raise CustomError("Unauthorized webhook access")
 
     payload_status = request_data.get("payload_status")
 
