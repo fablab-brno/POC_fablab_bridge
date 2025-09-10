@@ -386,11 +386,16 @@ def add_classmarker_training_fn(request: Request) -> Response:
                                       return_attempts=True, token=FABMAN_API_KEY)
 
     if not request_data["result"]["passed"]:
-        # <<<---------------------- EMAIL: FAILED TRAINING, X ATTEMPTS LEFT---------------------->>>
-        template = "failed_attempt.html" if attempts < MAX_COURSE_ATTEMPTS else "out_of_attempts.html"
-        msg = Message("FabLab info - test failed", sender=MAIL_USERNAME, recipients=[member_data["emailAddress"]])
-        msg.html = render_template(template, training_title=training["title"])
-        mail.send(msg)
+        try:
+            # <<<---------------------- EMAIL: FAILED TRAINING, X ATTEMPTS LEFT---------------------->>>
+            template = "failed_attempt.html" if attempts < MAX_COURSE_ATTEMPTS else "out_of_attempts.html"
+            msg = Message("FabLab info - test failed", sender=MAIL_USERNAME, recipients=[member_data["emailAddress"]])
+            msg.html = render_template(template, training_title=training["title"])
+            mail.send(msg)
+
+        except Exception as e:
+            print(f'FAILED TEST ATTEMPT - sender: {MAIL_USERNAME}, recipients: {member_data["emailAddress"]}, template_title: {training["title"]}')
+            print(f'Email sending error: {e}')
 
         return Response("Failed attempt saved in Fabman", 200)
 
@@ -421,9 +426,14 @@ def add_classmarker_training_fn(request: Request) -> Response:
     print(f'User ID {member_id} absolved training ID {training_id}')
 
     # <<<---------------------- EMAIL: TRAINING PASSED ---------------------->>>
-    msg = Message("FabLab info - test passed", sender=MAIL_USERNAME, recipients=[member_data["emailAddress"]])
-    msg.html = render_template("succeed_attempt.html", training_title=training["title"])
-    mail.send(msg)
+    try:
+        msg = Message("FabLab info - test passed", sender=MAIL_USERNAME, recipients=[member_data["emailAddress"]])
+        msg.html = render_template("succeed_attempt.html", training_title=training["title"])
+        mail.send(msg)
+
+    except Exception as e:
+        print(f'FAILED PASSED TEST EMAIL - sender: {MAIL_USERNAME}, recipients: {member_data["emailAddress"]}, template_title: {training["title"]}')
+        print(f'Email sending error: {e}')
 
     return Response("Training passed, updated in Fabman", 200)
 
@@ -448,6 +458,11 @@ def absolve_training_again_fn(request: Request) -> Response:
     except KeyError:
         raise CustomError(f'Unknown course quiz URL. '
                           f'Member ID: {member_id}, training ID: {training["id"]}')
+
+    res = requests.delete(
+        f'https://fabman.io/api/v1/members/{member_id}/trainings/{training["id"]}',
+        headers={"Authorization": f'{FABMAN_API_KEY}'}
+    )
 
     if res.status_code != 204:
         raise CustomError(f'Error during old training removing - {res.text}. '
