@@ -211,10 +211,8 @@ def check_members_training(training_id: int, trainings: List[Dict]) -> str:
     expired_training_id = ""
     old_training = get_member_training(training_id, trainings)
 
-    if old_training and old_training.get("untilDate"):
-        if not expired_date(old_training["untilDate"]):
-            print(f'Member has already absolved this training ({training_id}) and it is still active. ')
-
+    if old_training:
+        print(f'Member has already absolved this training ({training_id}) and it is still active. ')
         expired_training_id = old_training["id"]
 
     return expired_training_id
@@ -392,8 +390,6 @@ def add_classmarker_training_fn(request: Request) -> Response:
         # msg.html = render_template(template, training_title=training["title"])
         # mail.send(msg)
 
-        print(f'FAILED TEST ATTEMPT - sender: {MAIL_USERNAME}, recipients: {member_data["emailAddress"]}, template_title: {training["title"]}, request: {request_data}')
-
         return Response("Failed attempt saved in Fabman", 200)
 
     expired_training_id = check_members_training(
@@ -426,7 +422,6 @@ def add_classmarker_training_fn(request: Request) -> Response:
     # msg = Message("FabLab info - test passed", sender=MAIL_USERNAME, recipients=[member_data["emailAddress"]])
     # msg.html = render_template("succeed_attempt.html", training_title=training["title"])
     # mail.send(msg)
-    print(f'PASSED TEST EMAIL - sender: {MAIL_USERNAME}, recipients: {member_data["emailAddress"]}, template_title: {training["title"]}, request: {request_data}')
 
     return Response("Training passed, updated in Fabman", 200)
 

@@ -30,7 +30,7 @@ def main_loop() -> None | Flask:
         flask_app.run(debug=True, port=port, host=host)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__" or __name__ == "main_run":
     if not FABMAN_API_KEY:
         raise Exception("Missing Fabman API key")
 
