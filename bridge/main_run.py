@@ -2,7 +2,7 @@ import sys
 import os
 from flask import Flask
 from application.configs.config import FABMAN_API_KEY, CLASSMARKER_WEBHOOK_SECRET, FERNET_KEY, FLASK_SECRET_KEY,\
-    MAIL_USERNAME, MAIL_PASSWORD
+    MAIL_USERNAME, ECOMAIL_API_KEY
 from application import create_app
 
 
@@ -30,7 +30,7 @@ def main_loop() -> None | Flask:
         flask_app.run(debug=True, port=port, host=host)
 
 
-if __name__ == "__main__" or __name__ == "main_run":
+if __name__ == "__main__":
     if not FABMAN_API_KEY:
         raise Exception("Missing Fabman API key")
 
@@ -46,8 +46,8 @@ if __name__ == "__main__" or __name__ == "main_run":
     if not MAIL_USERNAME:
         raise Exception("Missing email sender")
 
-    if not MAIL_PASSWORD:
-        raise Exception("Missing email password")
+    if not ECOMAIL_API_KEY:
+        raise Exception("Missing Ecomail API key")
 
     if BE_ENV != "prod":
         main_loop()

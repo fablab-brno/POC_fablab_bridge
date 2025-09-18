@@ -37,5 +37,5 @@ SWAGGER_TEMPLATE = {
 }
 
 
-mail = Mail()
+# mail = Mail()
 swagger = Swagger(template=SWAGGER_TEMPLATE)

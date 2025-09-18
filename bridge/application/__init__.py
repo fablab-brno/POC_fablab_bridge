@@ -3,7 +3,7 @@ import os
 from flask import Flask
 from flask_cors import CORS
 
-from .services.extensions import swagger, mail
+from .services.extensions import swagger
 
 
 def create_app() -> Flask:
@@ -22,7 +22,7 @@ def create_app() -> Flask:
 
 def register_extensions(app: Flask) -> None:
     """Register Flask extensions."""
-    mail.init_app(app)
+    # mail.init_app(app)
     swagger.init_app(app)
 
     return None
