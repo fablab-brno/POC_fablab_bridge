@@ -647,3 +647,77 @@ locked_booking_schema = {
         }
     }
 }
+
+assign_member_gender = {
+    "tags": [
+        "Webhooks"
+    ],
+    "parameters": [
+        {
+            "name": "body",
+            "in": "body",
+            "type": "object",
+            "required": True,
+            "schema": {
+                "$ref": "#/definitions/MemberData"
+            }
+        }
+    ],
+    "consumes": [
+        TYPE_JSON
+    ],
+    "produces": [
+        TYPE_JSON
+    ],
+    "deprecated": False,
+    "definitions": {
+        "MemberData": {
+            "type": "object",
+            "required": [
+                "id",
+                "emailAddress",
+                "firstName",
+                "lastName",
+                "lockVersion"
+            ],
+            "properties": {
+                "id": {
+                    "type": "integer",
+                    "description": "Member ID from Fabman"
+                },
+                "emailAddress": {
+                    "type": "string",
+                    "description": "Email address of the member"
+                },
+                "firstName": {
+                    "type": "string",
+                    "description": "Member first name"
+                },
+                "lastName": {
+                    "type": "string",
+                    "description": "Member last name"
+                },
+                "lockVersion": {
+                    "type": "number",
+                    "description": "Current lock version of member data"
+                }
+            },
+            "example": {
+                "id": 123456,
+                "emailAddress": "user@example.com",
+                "firstName": "John",
+                "lastName": "Doe",
+                "lockVersion": 1
+            }
+        }
+    },
+    "responses": {
+        "200": {
+            "description": "Member gender updated",
+            "schema": {
+                "type": "string",
+                "example": ""
+            }
+        }
+    }
+}

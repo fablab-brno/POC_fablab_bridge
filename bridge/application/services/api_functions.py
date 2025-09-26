@@ -1,18 +1,18 @@
 import requests
-from flask import session, Request, Response, render_template, jsonify
+from flask import session, Request, Response, jsonify
 import hmac
 import hashlib
 import base64
-from datetime import datetime, timedelta
+from datetime import datetime
 from cryptography.fernet import Fernet
 import os
 
-from typing import Dict, List, Union, Tuple
+from typing import Dict, List, Union, Tuple, Optional
 from application.services.tools import get_current_training_with_index, get_member_training, expired_date
 from application.configs.config import CLASSMARKER_WEBHOOK_SECRET, FABMAN_API_KEY, MAX_COURSE_ATTEMPTS, FERNET_KEY,\
-    CRONJOB_TOKEN, MAIL_USERNAME, VERIFY_CLASSMARKER_REQUESTS, COURSES_WEB_PRIVATE_KEY
+    CRONJOB_TOKEN, MAIL_USERNAME, ECOMAIL_API_KEY, VERIFY_CLASSMARKER_REQUESTS, ECOMAIL_MAIL_TEMPLATES
 from ..services.error_handlers import CustomError
-from ..services.extensions import mail, Message
+# from ..services.extensions import mail, Message
 from application.services.tools import decrypt_identifiers
 
 
@@ -211,8 +211,10 @@ def check_members_training(training_id: int, trainings: List[Dict]) -> str:
     expired_training_id = ""
     old_training = get_member_training(training_id, trainings)
 
-    if old_training:
-        print(f'Member has already absolved this training ({training_id}) and it is still active. ')
+    if old_training and old_training.get("untilDate"):
+        if not expired_date(old_training["untilDate"]):
+            print(f'Member has already absolved this training ({training_id}) and it is still active. ')
+
         expired_training_id = old_training["id"]
 
     return expired_training_id
@@ -345,22 +347,46 @@ def locked_bookings_inner_fn(request_data: dict) -> None:
         raise ValueError("Missing member ID, email or resources name")
 
     # <<<---------------------- EMAIL: BOOKED RESOURCE IS LOCKED ---------------------->>>
-    msg = Message("FabLab info - locked resource", sender=MAIL_USERNAME,
-                  recipients=[member_email])
-    msg.html = render_template(
-        "locked_booking.html",
-        locked_resource=resource
+    send_email([member_email], f'FabLab info - locked resource ({resource})', "locked_booking")
+
+    # msg = Message("FabLab info - locked resource", sender=MAIL_USERNAME,
+    #               recipients=[member_email])
+    # msg.html = render_template(
+    #     "locked_booking.html",
+    #     locked_resource=resource
+    # )
+    # mail.send(msg)
+
+
+def send_email(recipients: List[str], subject: str, template: str) -> None:
+    res = requests.post(
+        "https://api2.ecomailapp.cz/transactional/send-template",
+        json=  {
+            "message": {
+                "template_id": ECOMAIL_MAIL_TEMPLATES.get(template),
+                "subject": subject,
+                "from_name": "FabLab Robot",
+                "from_email": MAIL_USERNAME,
+                "to": [{"email": r} for r in recipients]
+            }
+        },
+        headers={
+            "key": ECOMAIL_API_KEY,
+            "Content-Type": "application/json"
+        }
     )
-    mail.send(msg)
+
+    if res.status_code != 200:
+        raise CustomError(f'Email sending error: {res.text}')
 
 
 def add_classmarker_training_fn(request: Request) -> Response:
-    hmac_header = request.headers.get('X-Classmarker-Hmac-Sha256')
+    # hmac_header = request.headers.get('X-Classmarker-Hmac-Sha256')
+    # request_data = request.json
+    #
+    # if VERIFY_CLASSMARKER_REQUESTS and not verify_payload(request.data, hmac_header.encode('ascii', 'ignore')):
+    #     raise CustomError("Unauthorized webhook access")
     request_data = request.json
-    
-    if VERIFY_CLASSMARKER_REQUESTS and not verify_payload(request.data, hmac_header.encode('ascii', 'ignore')):
-        raise CustomError("Unauthorized webhook access")
-
     payload_status = request_data.get("payload_status")
 
     if payload_status == "verify":
@@ -384,11 +410,18 @@ def add_classmarker_training_fn(request: Request) -> Response:
                                       return_attempts=True, token=FABMAN_API_KEY)
 
     if not request_data["result"]["passed"]:
-        # <<<---------------------- EMAIL: FAILED TRAINING, X ATTEMPTS LEFT---------------------->>>
-        # template = "failed_attempt.html" if attempts < MAX_COURSE_ATTEMPTS else "out_of_attempts.html"
-        # msg = Message("FabLab info - test failed", sender=MAIL_USERNAME, recipients=[member_data["emailAddress"]])
-        # msg.html = render_template(template, training_title=training["title"])
-        # mail.send(msg)
+        try:
+            # <<<---------------------- EMAIL: FAILED TRAINING, X ATTEMPTS LEFT---------------------->>>
+            send_email([member_data["emailAddress"]], f'FabLab info - test failed ({training["title"]})', "failed_attempt" if attempts < MAX_COURSE_ATTEMPTS else "out_of_attempts")
+
+            # template = "failed_attempt.html" if attempts < MAX_COURSE_ATTEMPTS else "out_of_attempts.html"
+            # msg = Message("FabLab info - test failed", sender=MAIL_USERNAME, recipients=[member_data["emailAddress"]])
+            # msg.html = render_template(template, training_title=training["title"])
+            # mail.send(msg)
+
+        except Exception as e:
+            print(f'FAILED TEST ATTEMPT - sender: {MAIL_USERNAME}, recipients: {member_data["emailAddress"]}, template_title: {training["title"]}')
+            print(f'Email sending error: {e}')
 
         return Response("Failed attempt saved in Fabman", 200)
 
@@ -419,9 +452,16 @@ def add_classmarker_training_fn(request: Request) -> Response:
     print(f'User ID {member_id} absolved training ID {training_id}')
 
     # <<<---------------------- EMAIL: TRAINING PASSED ---------------------->>>
-    # msg = Message("FabLab info - test passed", sender=MAIL_USERNAME, recipients=[member_data["emailAddress"]])
-    # msg.html = render_template("succeed_attempt.html", training_title=training["title"])
-    # mail.send(msg)
+    try:
+        send_email([member_data["emailAddress"]], f'FabLab info - test passed ({training["title"]})', "succeed_attempt")
+
+        # msg = Message("FabLab info - test passed", sender=MAIL_USERNAME, recipients=[member_data["emailAddress"]])
+        # msg.html = render_template("succeed_attempt.html", training_title=training["title"])
+        # mail.send(msg)
+
+    except Exception as e:
+        print(f'FAILED PASSED TEST EMAIL - sender: {MAIL_USERNAME}, recipients: {member_data["emailAddress"]}, template_title: {training["title"]}')
+        print(f'Email sending error: {e}')
 
     return Response("Training passed, updated in Fabman", 200)
 
@@ -520,27 +560,28 @@ def training_expiration_fn(request: Request) -> Response:
     if request.headers.get("CronjobToken") != CRONJOB_TOKEN:
         raise CustomError("Unauthorized access")
 
-    public_key = hashlib.sha512(f'{member_id}{COURSES_WEB_PRIVATE_KEY}'.encode()).hexdigest()
-    url = f'https://skoleni.fablabbrno.cz?id={member_id}&key={public_key}'
+    # public_key = hashlib.sha512(f'{member_id}{COURSES_WEB_PRIVATE_KEY}'.encode()).hexdigest()
+    # url = f'https://skoleni.fablabbrno.cz?id={member_id}&key={public_key}'
 
     member_data = data_from_get_request(f'https://fabman.io/api/v1/members/{member_id}', FABMAN_API_KEY)
     training_data = get_training_links(request_data, FABMAN_API_KEY)
 
     # <<<---------------------- EMAIL: TRAINING EXPIRATION ---------------------->>>
-    msg = Message("FabLab info - training expiration", sender=MAIL_USERNAME, recipients=[member_data["emailAddress"]])
-    msg.html = render_template(
-        "training_expiration.html",
-        training_title=training_data.get("title"),
-        training_url=url
-    )
-    mail.send(msg)
+    send_email([member_data["emailAddress"]], f'FabLab info - training expiration ({training_data.get("title")})', "training_expiration")
+
+    # msg = Message("FabLab info - training expiration", sender=MAIL_USERNAME, recipients=[member_data["emailAddress"]])
+    # msg.html = render_template(
+    #     "training_expiration.html",
+    #     training_title=training_data.get("title"),
+    #     training_url=url
+    # )
+    # mail.send(msg)
 
     return Response("", 200)
 
 
 def get_list_of_absolved_trainings_fn(member_id: str) -> List[dict]:
-    token = os.environ['FABMAN_API_KEY']
-    trainings = get_active_user_trainings_and_user_data(member_id, token)[0]
+    trainings = get_active_user_trainings_and_user_data(member_id, FABMAN_API_KEY)[0]
     res = []
 
     for t in trainings:
@@ -597,6 +638,69 @@ def get_list_of_absolved_trainings_fn(member_id: str) -> List[dict]:
 #             })
 # 
 #     return Response("LOCKED RESOURCE", 200)
+
+
+def handle_member_create_event(request: Request) -> Response:
+    request_data = request.json
+
+    if request_data.get("type") != "member_created":
+        return Response("Not a member create event, ignored", 200)
+
+    return Response(recognize_and_assing_member_gender(request_data["details"].get("member") or {}), 200)
+
+
+def recognize_and_assing_member_gender(member_data: dict) -> str:
+    gender = recognize_gender(member_data.get("emailAddress"), member_data.get("firstName"), member_data.get("lastName"))
+
+    if gender is None:
+        not_recognized = f'Member gender not recognized (ID: {member_data.get("id")})'
+
+        print(not_recognized)
+
+        return not_recognized
+
+    requests.put(
+        f'https://fabman.io/api/v1/members/{member_data.get("id")}',
+        json={
+            "lockVersion": member_data.get("lockVersion"),
+            "gender": gender
+        },
+        headers={
+            "Authorization": FABMAN_API_KEY
+        }
+    )
+
+    return "Members's gender updated"
+
+
+def recognize_gender(email: str, first_name: Optional[str], last_name: Optional[str]) -> Optional[str]:
+    subscriber = requests.post(
+        "https://api2.ecomailapp.cz/lists/14/subscribe",
+        json={
+            "subscriber_data": {
+                "email": email,
+                "name": first_name,
+                "surname": last_name
+            }
+        },
+        headers={
+            "key": ECOMAIL_API_KEY,
+            "Content-Type": "application/json"
+        }
+    ).json()
+
+    requests.delete(
+        "https://api2.ecomailapp.cz/lists/14/unsubscribe",
+        json={
+            "email": email
+        },
+        headers={
+            "key": ECOMAIL_API_KEY,
+            "Content-Type": "application/json"
+        }
+    )
+
+    return subscriber.get("gender")
 
 
 def get_training_links_fn(request: Request) -> Response:
