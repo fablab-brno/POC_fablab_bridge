@@ -15,7 +15,16 @@ def check_locked_bookings():
         )]
 
     else:
-        members = data_from_get_request("https://fabman.io/api/v1/members", FABMAN_API_KEY)
+        members = []
+        should_continue = True
+        count = 500
+        page = 0
+
+        while should_continue:
+            res = data_from_get_request(f'https://fabman.io/api/v1/members?embed=trainings&limit={count}&offset={count * page}', FABMAN_API_KEY)
+            should_continue = len(res) > 0
+            page += 1
+            members.extend(res)
 
     now = datetime.now()
     check_end_datetime = now + timedelta(days=int(os.getenv("LOCKED_BOOKINGS_CHECK_DAYS_BEFORE",)))
