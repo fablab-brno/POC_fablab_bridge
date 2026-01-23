@@ -68,7 +68,7 @@ def handle_exception(fn_name: str, e: Exception, error_stack: List[str], member_
     requests.post(
         f'{DISCORD_BOT_URL}/fabman/errors',
         json={
-            "message": e.args[0],
+            "message": e.args[0] if e.args else str(error),
             "type": type(e).__name__,
             "stack": stack
         },
