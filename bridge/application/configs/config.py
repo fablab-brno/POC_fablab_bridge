@@ -29,4 +29,4 @@ ECOMAIL_MAIL_TEMPLATES = {
     "locked_booking": os.getenv("ECOMAIL_TEMPLATE_ID_LOCKED_BOOKING")
 }
 
-ECOMAIL_SEND_EMAILS = os.getenv("ECOMAIL_SEND_EMAILS", True)
+ECOMAIL_SEND_EMAILS = str(os.getenv("ECOMAIL_SEND_EMAILS", True)).lower() not in ["1", "true"]
