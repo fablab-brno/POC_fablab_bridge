@@ -28,3 +28,5 @@ ECOMAIL_MAIL_TEMPLATES = {
     "unexpected_error": os.getenv("ECOMAIL_TEMPLATE_ID_ERROR"),
     "locked_booking": os.getenv("ECOMAIL_TEMPLATE_ID_LOCKED_BOOKING")
 }
+
+ECOMAIL_SEND_EMAILS = os.getenv("ECOMAIL_SEND_EMAILS", True)

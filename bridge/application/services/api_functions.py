@@ -10,7 +10,7 @@ import os
 from typing import Dict, List, Union, Tuple, Optional
 from application.services.tools import get_current_training_with_index, get_member_training, expired_date
 from application.configs.config import CLASSMARKER_WEBHOOK_SECRET, FABMAN_API_KEY, MAX_COURSE_ATTEMPTS, FERNET_KEY,\
-    CRONJOB_TOKEN, MAIL_USERNAME, ECOMAIL_API_KEY, VERIFY_CLASSMARKER_REQUESTS, ECOMAIL_MAIL_TEMPLATES
+    CRONJOB_TOKEN, MAIL_USERNAME, ECOMAIL_API_KEY, VERIFY_CLASSMARKER_REQUESTS, ECOMAIL_MAIL_TEMPLATES, ECOMAIL_SEND_EMAILS
 from ..services.error_handlers import CustomError
 # from ..services.extensions import mail, Message
 from application.services.tools import decrypt_identifiers
@@ -359,6 +359,9 @@ def locked_bookings_inner_fn(request_data: dict) -> None:
 
 
 def send_email(recipients: List[str], subject: str, template: str) -> None:
+    if not ECOMAIL_SEND_EMAILS:
+        return
+
     res = requests.post(
         "https://api2.ecomailapp.cz/transactional/send-template",
         json=  {
