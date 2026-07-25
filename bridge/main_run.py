@@ -17,9 +17,10 @@ def main_loop() -> None | Flask:
         host_index = sys.argv.index("--host")
         host = sys.argv[host_index + 1]
 
-    if "--port" in sys.argv or "-p" in sys.argv:
-        port_index = sys.argv.index("--port") or sys.argv.index("-p")
-        port = int(sys.argv[port_index + 1])
+    if "--port" in sys.argv:
+        port = int(sys.argv[sys.argv.index("--port") + 1])
+    elif "-p" in sys.argv:
+        port = int(sys.argv[sys.argv.index("-p") + 1])
 
     flask_app = create_app()
 
