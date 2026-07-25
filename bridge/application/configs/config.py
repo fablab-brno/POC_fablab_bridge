@@ -1,7 +1,7 @@
 import os
 
 
-MAX_COURSE_ATTEMPTS = os.getenv("MAX_COURSE_ATTEMPTS", 3)
+MAX_COURSE_ATTEMPTS = int(os.getenv("MAX_COURSE_ATTEMPTS", 3))
 FERNET_KEY = os.getenv("FERNET_KEY")
 FABMAN_API_KEY = os.getenv("FABMAN_API_KEY")
 ECOMAIL_API_KEY = os.getenv("ECOMAIL_API_KEY")
