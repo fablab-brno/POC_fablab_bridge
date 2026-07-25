@@ -27,13 +27,13 @@ def check_locked_bookings():
             members.extend(res)
 
     now = datetime.now()
-    check_end_datetime = now + timedelta(days=int(os.getenv("LOCKED_BOOKINGS_CHECK_DAYS_BEFORE",)))
+    check_end_datetime = now + timedelta(days=int(os.getenv("LOCKED_BOOKINGS_CHECK_DAYS_BEFORE", "7")))
     mail_sent = 0
 
     locked_resources = data_from_get_request(f'https://fabman.io/api/v1/resources?state=locked', FABMAN_API_KEY)
 
     bookings = data_from_get_request(
-        f'https://fabman.io/api/v1/bookings?state=confirmed&fromDateTime={now.strftime("%Y-%m-%dT%H:%m")}&untilDateTime={check_end_datetime.strftime("%Y-%m-%dT%H:%m")}',
+        f'https://fabman.io/api/v1/bookings?state=confirmed&fromDateTime={now.strftime("%Y-%m-%dT%H:%M")}&untilDateTime={check_end_datetime.strftime("%Y-%m-%dT%H:%M")}',
         FABMAN_API_KEY
     )
 
