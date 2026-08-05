@@ -26,7 +26,7 @@ def require_web_auth(f):
                 raise CustomError("Unauthorized access")
 
             print(f"[web-auth] log-but-allow: missing/invalid X-Bridge-Auth on "
-                  f"{request.method} {request.path}")
+                  f"{request.method} {request.path}", flush=True)
 
         return f(*args, **kwargs)
 
@@ -44,7 +44,7 @@ def require_fabman_webhook_key(f):
             if ENFORCE_WEB_AUTH:
                 raise CustomError("Unauthorized access")
 
-            print(f"[fabman-webhook] log-but-allow: missing/invalid key on {request.path}")
+            print(f"[fabman-webhook] log-but-allow: missing/invalid key on {request.path}", flush=True)
 
         return f(*args, **kwargs)
 
