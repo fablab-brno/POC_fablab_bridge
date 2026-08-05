@@ -713,4 +713,4 @@ def recognize_gender(email: str, first_name: Optional[str], last_name: Optional[
 def get_training_links_fn(request: Request) -> Response:
     request_data = request.json
 
-    return jsonify(get_training_links(request_data, request.headers.get("Authorization")))
+    return jsonify(get_training_links(request_data, FABMAN_API_KEY))

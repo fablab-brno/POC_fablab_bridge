@@ -14,6 +14,13 @@ TRACK_TIME = os.getenv("TRACK_TIME")
 DISCORD_BOT_URL = os.getenv("DISCORD_BOT_URL")
 BRIDGE_SECRET = os.getenv("BRIDGE_SECRET")
 
+# Web -> bridge shared-secret auth: the courses app sends X-Bridge-Auth == AUTH_HEADER.
+# ENFORCE_WEB_AUTH off = log-but-allow rollout (unauthenticated calls are logged, not
+# rejected). FABMAN_WEBHOOK_KEY gates the Fabman member-created webhook via ?key=.
+AUTH_HEADER = os.getenv("AUTH_HEADER")
+ENFORCE_WEB_AUTH = str(os.getenv("ENFORCE_WEB_AUTH", "false")).lower() in ["1", "true"]
+FABMAN_WEBHOOK_KEY = os.getenv("FABMAN_WEBHOOK_KEY")
+
 # COURSES_WEB_PRIVATE_KEY = os.getenv("COURSES_WEB_PRIVATE_KEY")
 
 # Obsolete

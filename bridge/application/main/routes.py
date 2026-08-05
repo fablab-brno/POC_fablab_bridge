@@ -9,6 +9,7 @@ from ..services.api_functions import (get_list_of_available_trainings_fn, get_tr
                                       absolve_training_again_fn, handle_member_create_event)
 # , activities_notifications_fn)
 from ..services.extensions import swag_from
+from ..services.auth import require_web_auth, require_fabman_webhook_key
 
 
 @main.route("/health", methods=["GET"])
@@ -32,6 +33,7 @@ def add_classmarker_training():
 @main.route("/absolve_training_again", methods=["POST"])
 @swag_from(swagger_config.absolve_training_again_schema)
 @error_handler
+@require_web_auth
 def absolve_training_again():
     """
     Endpoint for ClassMarker webhook
@@ -43,6 +45,7 @@ def absolve_training_again():
 @swag_from(swagger_config.absolved_trainings_schema)
 @track_api_time
 @error_handler
+@require_web_auth
 def get_list_of_absolved_trainings(member_id: str):
     """
     List of member's active trainings
@@ -54,6 +57,7 @@ def get_list_of_absolved_trainings(member_id: str):
 @swag_from(swagger_config.available_trainings_schema)
 @track_api_time
 @error_handler
+@require_web_auth
 def get_list_of_available_trainings(member_id: str):
     """
     List of all trainings available for online course
@@ -64,6 +68,7 @@ def get_list_of_available_trainings(member_id: str):
 @main.route("/get_training_links", methods=["POST"])
 @swag_from(swagger_config.training_urls_schema)
 @error_handler
+@require_web_auth
 def get_training_links():
     """
     Training's detail
@@ -94,6 +99,7 @@ def locked_booking():
 @main.route("/assign-member-gender", methods=["POST"])
 @swag_from(swagger_config.assign_member_gender)
 @error_handler
+@require_fabman_webhook_key
 def assign_member_gender():
     """
     Recognize gender of member
