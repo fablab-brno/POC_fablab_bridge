@@ -384,16 +384,20 @@ def send_email(recipients: List[str], subject: str, template: str) -> None:
 
 
 def add_classmarker_training_fn(request: Request) -> Response:
-    # hmac_header = request.headers.get('X-Classmarker-Hmac-Sha256')
-    # request_data = request.json
-    #
-    # if VERIFY_CLASSMARKER_REQUESTS and not verify_payload(request.data, hmac_header.encode('ascii', 'ignore')):
-    #     raise CustomError("Unauthorized webhook access")
+    # Verify the webhook really came from ClassMarker (HMAC-SHA256 over the raw
+    # body, keyed with CLASSMARKER_WEBHOOK_SECRET). Gated by VERIFY_CLASSMARKER_REQUESTS
+    # so it can be rolled out as a config flag without a code change.
+    if VERIFY_CLASSMARKER_REQUESTS:
+        hmac_header = request.headers.get("X-Classmarker-Hmac-Sha256")
+
+        if not hmac_header or not verify_payload(request.data, hmac_header.encode("ascii", "ignore")):
+            raise CustomError("Unauthorized webhook access")
+
     request_data = request.json
     payload_status = request_data.get("payload_status")
 
     if payload_status == "verify":
-        return Response({}, 200)
+        return Response("", 200)
 
     identifiers = decrypt_identifiers(request_data["result"].get("cm_user_id"))
     member_id = int(identifiers.split("-")[0])
