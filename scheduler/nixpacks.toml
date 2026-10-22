@@ -4,4 +4,4 @@ providers = ["python"]
 NIXPACKS_PYTHON_VERSION = "3.11.3"
 
 [start]
-cmd = "env && python main_run.py"
+cmd = "python main_run.py"

@@ -18,4 +18,4 @@ ARG RAILWAY_API_URL=""
 
 EXPOSE 8000
 
-CMD env && python3 main_run.py
+CMD python3 main_run.py
