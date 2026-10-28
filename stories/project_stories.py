@@ -1,0 +1,233 @@
+import os
+import requests
+import traceback
+from datetime import datetime, timedelta, timezone
+from functools import wraps
+from typing import List, Dict, Union
+from zoneinfo import ZoneInfo
+
+
+FABMAN_API_URL = os.getenv("FABMAN_API_URL", "https://fabman.io/api/v1")
+FABMAN_API_KEY = os.getenv("FABMAN_API_KEY")
+RAILWAY_API_URL = os.getenv("RAILWAY_API_URL")
+CRONJOB_TOKEN = os.getenv("CRONJOB_TOKEN")
+
+
+def env_ids(name: str) -> List[int]:
+    return [int(i) for i in os.getenv(name, "").replace(" ", "").split(",") if i]
+
+
+RESOURCES = env_ids("PROJECT_STORIES_RESOURCES")
+RESOURCE_TYPES = env_ids("PROJECT_STORIES_RESOURCE_TYPES")
+EXCLUDE_MEMBERS = env_ids("PROJECT_STORIES_EXCLUDE_MEMBERS")
+MIN_MINUTES = int(os.getenv("PROJECT_STORIES_MIN_MINUTES", "20"))
+COOLDOWN_DAYS = int(os.getenv("PROJECT_STORIES_COOLDOWN_DAYS", "30"))
+LOOKBACK_HOURS = int(os.getenv("PROJECT_STORIES_LOOKBACK_HOURS", "24"))
+# Nothing is sent and no member is touched unless this is explicitly turned off.
+DRY_RUN = str(os.getenv("PROJECT_STORIES_DRY_RUN", "true")).lower() in ["1", "true"]
+
+METADATA_KEY = "project_story_asked_at"
+PRAGUE = ZoneInfo("Europe/Prague")
+PAGE_SIZE = 1000
+
+
+class CustomError(Exception):
+    def __init__(self, description, error_data=None):
+        self.args = (description, error_data)
+        self.description = description
+        self.data = error_data
+        super().__init__()
+
+    def __str__(self):
+        return self.description
+
+
+def error_handler(f):
+    @wraps(f)
+    def decorator(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+
+        except Exception:
+            print(traceback.format_exc())
+
+    return decorator
+
+
+def fabman_get(path: str, params: Dict = None) -> Union[List, Dict]:
+    res = requests.get(f'{FABMAN_API_URL}{path}', params=params, headers={"Authorization": f'{FABMAN_API_KEY}'})
+
+    if res.status_code != 200:
+        raise CustomError("Error during data fetching", f'{path}, {res.status_code}, {res.text[:300]}')
+
+    return res.json()
+
+
+def fabman_get_all(path: str, params: Dict) -> List[Dict]:
+    """
+    Fetch every page of a Fabman list endpoint.
+    """
+    items = []
+    offset = 0
+
+    while True:
+        page = fabman_get(path, {**params, "limit": PAGE_SIZE, "offset": offset})
+        items.extend(page)
+
+        if len(page) < PAGE_SIZE:
+            return items
+
+        offset += PAGE_SIZE
+
+
+def parse_dt(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def active_minutes(log: Dict) -> int:
+    """
+    Minutes the machine was switched on for the member, idle time left out.
+    """
+    total = (parse_dt(log["stoppedAt"]) - parse_dt(log["createdAt"])).total_seconds()
+
+    return int((total - (log.get("idleDurationSeconds") or 0)) // 60)
+
+
+def watched_resources() -> Dict[int, str]:
+    """
+    Resource id -> name for every machine selected by PROJECT_STORIES_RESOURCES or PROJECT_STORIES_RESOURCE_TYPES.
+    """
+    resources = fabman_get_all("/resources", {})
+
+    return {
+        r["id"]: r["name"] for r in resources
+        if r["id"] in RESOURCES or r["type"] in RESOURCE_TYPES
+    }
+
+
+def recently_asked(member: Dict, now: datetime) -> bool:
+    asked_at = (member.get("metadata") or {}).get(METADATA_KEY)
+
+    return bool(asked_at) and parse_dt(asked_at) > now - timedelta(days=COOLDOWN_DAYS)
+
+
+def mark_asked(member: Dict, now: datetime) -> None:
+    metadata = dict(member.get("metadata") or {})
+    metadata[METADATA_KEY] = now.isoformat()
+
+    res = requests.put(
+        f'{FABMAN_API_URL}/members/{member["id"]}',
+        json={"lockVersion": member["lockVersion"], "metadata": metadata},
+        headers={"Authorization": f'{FABMAN_API_KEY}'}
+    )
+
+    if res.status_code != 200:
+        raise CustomError("Error during updating member metadata", f'{member["id"]}, {res.status_code}')
+
+
+def send_project_story(member_id: int, resource_name: str, log: Dict) -> bool:
+    used_on = parse_dt(log["stoppedAt"]).astimezone(PRAGUE)
+
+    res = requests.post(
+        f'{RAILWAY_API_URL}/project-story',
+        json={
+            "member_id": member_id,
+            "resource": resource_name,
+            "used_on": f'{used_on.day}. {used_on.month}. {used_on.year}',
+            "duration_minutes": active_minutes(log)
+        },
+        headers={"CronjobToken": f'{CRONJOB_TOKEN}'}
+    )
+
+    # the bridge error handler answers 200 with an "Error: ..." body
+    ok = res.status_code == 200 and not res.text.startswith("Error")
+
+    if not ok:
+        print(f'Error during project story email for member {member_id}')
+        print(res.content)
+
+    return ok
+
+
+@error_handler
+def check_project_stories():
+    """
+    Ask members who finished a long enough session on a watched machine what they made.
+    One question per member per PROJECT_STORIES_COOLDOWN_DAYS, about their longest recent session.
+    """
+    if not RESOURCES and not RESOURCE_TYPES:
+        print("No machines selected - set PROJECT_STORIES_RESOURCES or PROJECT_STORIES_RESOURCE_TYPES (see list_resources)")
+        return
+
+    if not DRY_RUN and requests.get(f'{RAILWAY_API_URL}/health').status_code != 200:
+        print(f'no healthcheck on {RAILWAY_API_URL}/health')
+        return
+
+    now = datetime.now(timezone.utc)
+    since = now - timedelta(hours=LOOKBACK_HOURS)
+    resources = watched_resources()
+
+    logs = fabman_get_all("/resource-logs", {
+        "type": "allowed",
+        "status": "complete",
+        "from": (since - timedelta(days=1)).date().isoformat(),
+        "order": "desc"
+    })
+
+    if os.getenv("TEST_USER"):
+        logs = [lg for lg in logs if str(lg["member"]) == os.getenv("TEST_USER")]
+
+    # longest qualifying session per member
+    candidates = {}
+
+    for lg in logs:
+        if lg["resource"] not in resources or not lg.get("member") or not lg.get("stoppedAt"):
+            continue
+
+        if parse_dt(lg["stoppedAt"]) < since or active_minutes(lg) < MIN_MINUTES:
+            continue
+
+        if lg["member"] in EXCLUDE_MEMBERS:
+            continue
+
+        best = candidates.get(lg["member"])
+
+        if not best or active_minutes(lg) > active_minutes(best):
+            candidates[lg["member"]] = lg
+
+    sent = 0
+
+    for member_id, lg in candidates.items():
+        member = fabman_get(f'/members/{member_id}')
+        resource_name = resources[lg["resource"]]
+
+        if recently_asked(member, now):
+            print(f'member {member_id} skip - asked in the last {COOLDOWN_DAYS} days')
+            continue
+
+        if DRY_RUN:
+            print(f'DRY RUN: would ask member {member_id} about {resource_name} ({active_minutes(lg)} min, log {lg["id"]})')
+            continue
+
+        if send_project_story(member_id, resource_name, lg):
+            mark_asked(member, now)
+            sent += 1
+            print(f'project story email sent to member {member_id} ({resource_name})')
+
+    print(f'Checked {len(logs)} sessions, {len(candidates)} qualifying members, {sent} emails sent{" (dry run)" if DRY_RUN else ""}.')
+
+
+@error_handler
+def list_resources():
+    """
+    Print machines and machine types with their Fabman ids, to fill in the env variables.
+    """
+    types = {t["id"]: t["name"] for t in fabman_get_all("/resource-types", {})}
+
+    print("RESOURCE TYPES (PROJECT_STORIES_RESOURCE_TYPES):")
+    for type_id, name in sorted(types.items(), key=lambda t: t[1]):
+        print(f'  {type_id:>7}  {name}')
+
+    print("RESOURCES (PROJECT_STORIES_RESOURCES):")
+    for r in sorted(fabman_get_all("/resources", {}), key=lambda r: (types.get(r["type"], ""), r["name"])):
+        print(f'  {r["id"]:>7}  {r["name"]}  [{types.get(r["type"], r["type"])}, {r["state"]}]')

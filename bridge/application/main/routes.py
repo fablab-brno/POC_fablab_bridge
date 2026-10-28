@@ -6,7 +6,7 @@ from . import main
 from ..services.error_handlers import error_handler
 from ..services.api_functions import (get_list_of_available_trainings_fn, get_training_links_fn, \
                                       add_classmarker_training_fn, training_expiration_fn, get_list_of_absolved_trainings_fn, locked_bookings_fn, \
-                                      absolve_training_again_fn, handle_member_create_event)
+                                      absolve_training_again_fn, handle_member_create_event, project_story_fn)
 # , activities_notifications_fn)
 from ..services.extensions import swag_from
 from ..services.auth import require_web_auth, require_fabman_webhook_key
@@ -94,6 +94,16 @@ def locked_booking():
     Handle expiration of trainings
     """
     return locked_bookings_fn(request)
+
+
+@main.route("/project-story", methods=["POST"])
+@swag_from(swagger_config.project_story_schema)
+@error_handler
+def project_story():
+    """
+    Ask member about the project made on a machine
+    """
+    return project_story_fn(request)
 
 
 @main.route("/assign-member-gender", methods=["POST"])

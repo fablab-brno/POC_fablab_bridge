@@ -33,7 +33,16 @@ ECOMAIL_MAIL_TEMPLATES = {
     "out_of_attempts": os.getenv("ECOMAIL_TEMPLATE_ID_TRAINING_OUT_OF_ATTEMPTS"),
     "training_expiration": os.getenv("ECOMAIL_TEMPLATE_ID_TRAINING_EXPIRATION"),
     "unexpected_error": os.getenv("ECOMAIL_TEMPLATE_ID_ERROR"),
-    "locked_booking": os.getenv("ECOMAIL_TEMPLATE_ID_LOCKED_BOOKING")
+    "locked_booking": os.getenv("ECOMAIL_TEMPLATE_ID_LOCKED_BOOKING"),
+    "project_story": os.getenv("ECOMAIL_TEMPLATE_ID_PROJECT_STORY")
 }
 
 ECOMAIL_SEND_EMAILS = str(os.getenv("ECOMAIL_SEND_EMAILS", True)).lower() in ["1", "true"]
+
+# Project stories (stories/ scheduler): asks members what they made on a machine.
+# A switch of its own, so the question can be stopped without touching other emails.
+PROJECT_STORIES_SEND_EMAILS = str(os.getenv("PROJECT_STORIES_SEND_EMAILS", "false")).lower() in ["1", "true"]
+PROJECT_STORIES_REPLY_TO = os.getenv("PROJECT_STORIES_REPLY_TO")
+PROJECT_STORIES_SUBJECT = os.getenv("PROJECT_STORIES_SUBJECT", "Co vzniklo na stroji {resource}?")
+# {member_id}, {resource} and {date} are replaced (URL-encoded) - use a Google Forms pre-filled link.
+PROJECT_STORIES_FORM_URL = os.getenv("PROJECT_STORIES_FORM_URL", "https://forms.gle/RzqUZWeHa14mCwMt5")

@@ -648,6 +648,76 @@ locked_booking_schema = {
     }
 }
 
+project_story_schema = {
+    "tags": [
+        "SchedulersRequests"
+    ],
+    "parameters": [
+        {
+            "name": "body",
+            "in": "body",
+            "type": "object",
+            "required": True,
+            "schema": {
+                "$ref": "#/definitions/ProjectStoryInputs"
+            }
+        }
+    ],
+    "consumes": [
+        TYPE_JSON
+    ],
+    "produces": [
+        TYPE_JSON
+    ],
+    "deprecated": False,
+    "definitions": {
+        "ProjectStoryInputs": {
+            "type": "object",
+            "required": [
+                "member_id",
+                "resource",
+                "used_on"
+            ],
+            "properties": {
+                "member_id": {
+                    "type": "integer",
+                    "description": "Member ID from Fabman"
+                },
+                "resource": {
+                    "type": "string",
+                    "description": "Name of the machine"
+                },
+                "used_on": {
+                    "type": "string",
+                    "description": "Day of the session, formatted for the email"
+                },
+                "duration_minutes": {
+                    "type": "integer",
+                    "description": "Active minutes on the machine"
+                }
+            },
+            "example": {
+                "member_id": 123456,
+                "resource": "Laser Trotec Speedy 400",
+                "used_on": "28. 10. 2026",
+                "duration_minutes": 45
+            }
+        }
+    },
+    "responses": {
+        "200": {
+            "description": "Email sent",
+            "schema": {
+                "type": "string",
+                "example": ""
+            }
+        },
+        "503": {
+            "description": "PROJECT_STORIES_SEND_EMAILS is off, nothing sent"
+        }
+    }
+}
+
 assign_member_gender = {
     "tags": [
         "Webhooks"

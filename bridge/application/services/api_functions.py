@@ -6,11 +6,12 @@ import base64
 from datetime import datetime
 from cryptography.fernet import Fernet
 import os
+from urllib.parse import quote
 
 from typing import Dict, List, Union, Tuple, Optional
 from application.services.tools import get_current_training_with_index, get_member_training, expired_date
 from application.configs.config import CLASSMARKER_WEBHOOK_SECRET, FABMAN_API_KEY, MAX_COURSE_ATTEMPTS, FERNET_KEY,\
-    CRONJOB_TOKEN, MAIL_USERNAME, ECOMAIL_API_KEY, VERIFY_CLASSMARKER_REQUESTS, ECOMAIL_MAIL_TEMPLATES, ECOMAIL_SEND_EMAILS
+    CRONJOB_TOKEN, MAIL_USERNAME, ECOMAIL_API_KEY, VERIFY_CLASSMARKER_REQUESTS, ECOMAIL_MAIL_TEMPLATES, ECOMAIL_SEND_EMAILS,     PROJECT_STORIES_SEND_EMAILS, PROJECT_STORIES_REPLY_TO, PROJECT_STORIES_SUBJECT, PROJECT_STORIES_FORM_URL
 from ..services.error_handlers import CustomError
 # from ..services.extensions import mail, Message
 from application.services.tools import decrypt_identifiers
@@ -358,21 +359,28 @@ def locked_bookings_inner_fn(request_data: dict) -> None:
     # mail.send(msg)
 
 
-def send_email(recipients: List[str], subject: str, template: str) -> None:
+def send_email(recipients: List[str], subject: str, template: str, merge_vars: Dict[str, str] = None,
+               reply_to: str = None, from_name: str = "FabLab Robot") -> None:
     if not ECOMAIL_SEND_EMAILS:
         return
 
+    message = {
+        "template_id": ECOMAIL_MAIL_TEMPLATES.get(template),
+        "subject": subject,
+        "from_name": from_name,
+        "from_email": MAIL_USERNAME,
+        "to": [{"email": r} for r in recipients]
+    }
+
+    if merge_vars:
+        message["global_merge_vars"] = [{"name": k, "content": v} for k, v in merge_vars.items()]
+
+    if reply_to:
+        message["reply_to"] = reply_to
+
     res = requests.post(
         "https://api2.ecomailapp.cz/transactional/send-template",
-        json=  {
-            "message": {
-                "template_id": ECOMAIL_MAIL_TEMPLATES.get(template),
-                "subject": subject,
-                "from_name": "FabLab Robot",
-                "from_email": MAIL_USERNAME,
-                "to": [{"email": r} for r in recipients]
-            }
-        },
+        json={"message": message},
         headers={
             "key": ECOMAIL_API_KEY,
             "Content-Type": "application/json"
@@ -583,6 +591,52 @@ def training_expiration_fn(request: Request) -> Response:
     #     training_url=url
     # )
     # mail.send(msg)
+
+    return Response("", 200)
+
+
+def project_story_fn(request: Request) -> Response:
+    """
+    Ask a member what they made on a machine (stories scheduler), for success stories on Made in FabLab.
+    """
+    if request.headers.get("CronjobToken") != CRONJOB_TOKEN:
+        raise CustomError("Unauthorized access")
+
+    request_data = request.json
+    member_id = request_data.get("member_id")
+    resource = request_data.get("resource")
+    used_on = request_data.get("used_on")
+
+    if not member_id or not resource or not used_on:
+        raise ValueError("Missing member_id, resource or used_on")
+
+    if not PROJECT_STORIES_SEND_EMAILS:
+        print(f'PROJECT STORY not sent (PROJECT_STORIES_SEND_EMAILS off) - member {member_id}, {resource}')
+
+        return Response("Project story emails are switched off", 503)
+
+    member_data = data_from_get_request(f'https://fabman.io/api/v1/members/{member_id}', FABMAN_API_KEY)
+
+    if not member_data.get("emailAddress"):
+        raise CustomError("Member has no email address", member_id)
+
+    form_url = PROJECT_STORIES_FORM_URL         .replace("{member_id}", quote(str(member_id)))         .replace("{resource}", quote(resource))         .replace("{date}", quote(used_on))
+
+    # <<<---------------------- EMAIL: PROJECT STORY ---------------------->>>
+    send_email(
+        [member_data["emailAddress"]],
+        PROJECT_STORIES_SUBJECT.replace("{resource}", resource),
+        "project_story",
+        merge_vars={
+            "FIRST_NAME": member_data.get("firstName") or "",
+            "RESOURCE": resource,
+            "USED_ON": used_on,
+            "DURATION_MINUTES": str(request_data.get("duration_minutes") or ""),
+            "FORM_URL": form_url
+        },
+        reply_to=PROJECT_STORIES_REPLY_TO,
+        from_name="FabLab Brno"
+    )
 
     return Response("", 200)
 
