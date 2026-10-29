@@ -122,14 +122,24 @@ def excluded(member: Dict) -> bool:
 
 
 def mark_asked(member: Dict, now: datetime) -> None:
-    metadata = dict(member.get("metadata") or {})
-    metadata[METADATA_KEY] = now.isoformat()
+    """
+    Adds the date to the member's metadata, keeping every other key. Fabman answers 409 when someone else saved
+    the member since it was read (lockVersion) - then read it again and retry instead of overwriting their change.
+    """
+    for _ in range(3):
+        metadata = dict(member.get("metadata") or {})
+        metadata[METADATA_KEY] = now.isoformat()
 
-    res = requests.put(
-        f'{FABMAN_API_URL}/members/{member["id"]}',
-        json={"lockVersion": member["lockVersion"], "metadata": metadata},
-        headers={"Authorization": f'{FABMAN_API_KEY}'}
-    )
+        res = requests.put(
+            f'{FABMAN_API_URL}/members/{member["id"]}',
+            json={"lockVersion": member["lockVersion"], "metadata": metadata},
+            headers={"Authorization": f'{FABMAN_API_KEY}'}
+        )
+
+        if res.status_code != 409:
+            break
+
+        member = fabman_get(f'/members/{member["id"]}')
 
     if res.status_code != 200:
         raise CustomError("Error during updating member metadata", f'{member["id"]}, {res.status_code}')

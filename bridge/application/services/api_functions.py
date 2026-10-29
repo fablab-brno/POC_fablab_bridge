@@ -824,15 +824,20 @@ def project_story_opt_out_fn(request: Request) -> Response:
             "Other FabLab emails stay as they are.</p>", button=True), 200, mimetype="text/html")
 
     try:
-        member_data = data_from_get_request(f'https://fabman.io/api/v1/members/{member_id}', FABMAN_API_KEY)
-        metadata = dict(member_data.get("metadata") or {})
-        metadata[PROJECT_STORIES_OPT_OUT_KEY] = datetime.utcnow().isoformat() + "Z"
+        # 409 = someone saved the member since we read it (lockVersion), read again instead of overwriting
+        for _ in range(3):
+            member_data = data_from_get_request(f'https://fabman.io/api/v1/members/{member_id}', FABMAN_API_KEY)
+            metadata = dict(member_data.get("metadata") or {})
+            metadata[PROJECT_STORIES_OPT_OUT_KEY] = datetime.utcnow().isoformat() + "Z"
 
-        res = requests.put(
-            f'https://fabman.io/api/v1/members/{member_id}',
-            json={"lockVersion": member_data["lockVersion"], "metadata": metadata},
-            headers={"Authorization": f'{FABMAN_API_KEY}'}
-        )
+            res = requests.put(
+                f'https://fabman.io/api/v1/members/{member_id}',
+                json={"lockVersion": member_data["lockVersion"], "metadata": metadata},
+                headers={"Authorization": f'{FABMAN_API_KEY}'}
+            )
+
+            if res.status_code != 409:
+                break
 
         if res.status_code != 200:
             raise CustomError("Error during project story opt-out", f'{member_id}, {res.status_code}')
