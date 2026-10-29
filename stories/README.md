@@ -2,13 +2,19 @@
 
 Asks members what they made on a machine, for the success stories on Made in FabLab.
 
-Every run reads finished machine sessions from Fabman (`/resource-logs`) and picks members whose session on a
-watched machine lasted at least `PROJECT_STORIES_MIN_MINUTES` (idle time left out). Each of them gets one email
-through the bridge (`POST /project-story`) about their longest recent session, at most once per
+On workdays at 9:00 Prague time it reads machine sessions that ended since midnight of the previous workday
+(Monday: since Friday) from Fabman (`/resource-logs`) and picks members whose session on a watched machine lasted
+at least `PROJECT_STORIES_MIN_MINUTES` (idle time left out). Each of them gets one email through the bridge
+(`POST /project-story`) about their longest session, at most once per
 `PROJECT_STORIES_COOLDOWN_DAYS`. The date of the last question is kept in the member's Fabman metadata
 (`project_story_asked_at`), so the scheduler needs no database and a re-run never asks twice. The email carries
 a signed opt-out link (`/project-story/opt-out` on the bridge); a click sets `project_stories_opt_out` in the same
 metadata and the member is never asked again. Newsletters and other FabLab emails are not touched.
+
+The email never shows the internal Fabman name of a machine. **machines.py** maps each resource id to a category
+in the Czech 6th case and in English ("na laseru" / "on the laser cutter"); a machine missing there reads
+"na jednom ze strojů". Add a new machine there. Doors, entrances, the key locker and test devices are in
+`NEVER_ASK` and are skipped even if listed in `PROJECT_STORIES_RESOURCES`.
 
 The email is an Ecomail transactional template with a link to a Google Form and reply-to set to a person,
 so members can either fill the form or just answer the email.
@@ -28,8 +34,9 @@ and booking tasks.
 <br>
 
 # DEPLOYMENT
-Railway cron service with root directory `stories/`, e.g. schedule `0 * * * *` (hourly). Start command is in
-**nixpacks.toml**.
+Railway cron service with root directory `stories/`, schedule `0 7,8 * * 1-5` (UTC). Only the run that lands on
+9:00 in Prague sends, the other one exits - so it stays 9:00 in summer and winter time. Start command
+`python run.py` (set on the Railway service; Railpack ignores **nixpacks.toml**).
 
 <br>
 
@@ -46,7 +53,7 @@ Scheduler (this service):
   replied they don't want these e-mails - they stay on the FabLab newsletters)
 * PROJECT_STORIES_MIN_MINUTES: minimal active session length, default 20
 * PROJECT_STORIES_COOLDOWN_DAYS: default 30
-* PROJECT_STORIES_LOOKBACK_HOURS: how old a finished session may be, default 24
+* PROJECT_STORIES_SEND_HOUR: hour (Prague) of the sending run, default 9; `any` sends on every run, weekends too (tests)
 * PROJECT_STORIES_DRY_RUN: default `true` - log only
 * TEST_USER: only this member's sessions
 
@@ -54,8 +61,9 @@ Bridge:
 * ECOMAIL_TEMPLATE_ID_PROJECT_STORY: Ecomail transactional template
 * PROJECT_STORIES_SEND_EMAILS: (boolean) default `false` - the bridge answers 503 and sends nothing
 * PROJECT_STORIES_REPLY_TO: where replies go
-* PROJECT_STORIES_SUBJECT: default `Na čem právě pracuješ?` (`{resource}` is replaced)
+* PROJECT_STORIES_FROM_NAME: sender name, default `Honza z FabLabu Brno`
+* PROJECT_STORIES_SUBJECT: default `Co jsi vyrobil/a {na_stroji}?` (`{na_stroji}` and `{resource}` are replaced)
 * PROJECT_STORIES_FORM_URL: Google Forms pre-filled link; `{email}`, `{member_id}`, `{resource}` and `{date}` are replaced
 * PROJECT_STORIES_PUBLIC_URL: base of the opt-out link, default `https://$RAILWAY_PUBLIC_DOMAIN`
 
-Template merge tags: `*|FIRST_NAME|*`, `*|RESOURCE|*`, `*|USED_ON|*`, `*|DURATION_MINUTES|*`, `*|FORM_URL|*`, `*|OPT_OUT_URL|*`.
+Template merge tags: `*|NA_STROJI|*`, `*|ON_MACHINE|*`, `*|FIRST_NAME|*`, `*|RESOURCE|*`, `*|USED_ON|*`, `*|DURATION_MINUTES|*`, `*|FORM_URL|*`, `*|OPT_OUT_URL|*`.

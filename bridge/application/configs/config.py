@@ -43,7 +43,9 @@ ECOMAIL_SEND_EMAILS = str(os.getenv("ECOMAIL_SEND_EMAILS", True)).lower() in ["1
 # A switch of its own, so the question can be stopped without touching other emails.
 PROJECT_STORIES_SEND_EMAILS = str(os.getenv("PROJECT_STORIES_SEND_EMAILS", "false")).lower() in ["1", "true"]
 PROJECT_STORIES_REPLY_TO = os.getenv("PROJECT_STORIES_REPLY_TO")
-PROJECT_STORIES_SUBJECT = os.getenv("PROJECT_STORIES_SUBJECT", "Na čem právě pracuješ?")
+PROJECT_STORIES_FROM_NAME = os.getenv("PROJECT_STORIES_FROM_NAME", "Honza z FabLabu Brno")
+# {na_stroji} = the machine category in the Czech 6th case from the scheduler ("na laseru"), {resource} = Fabman name
+PROJECT_STORIES_SUBJECT = os.getenv("PROJECT_STORIES_SUBJECT", "Co jsi vyrobil/a {na_stroji}?")
 # {email}, {member_id}, {resource} and {date} are replaced (URL-encoded) - use a Google Forms pre-filled link.
 PROJECT_STORIES_FORM_URL = os.getenv("PROJECT_STORIES_FORM_URL", "https://forms.gle/RzqUZWeHa14mCwMt5")
 # Base of the opt-out link in the email - the bridge's own public address.

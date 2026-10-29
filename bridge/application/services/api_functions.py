@@ -14,7 +14,7 @@ from application.services.tools import get_current_training_with_index, get_memb
 from application.configs.config import CLASSMARKER_WEBHOOK_SECRET, FABMAN_API_KEY, MAX_COURSE_ATTEMPTS, FERNET_KEY,\
     CRONJOB_TOKEN, MAIL_USERNAME, ECOMAIL_API_KEY, VERIFY_CLASSMARKER_REQUESTS, ECOMAIL_MAIL_TEMPLATES, ECOMAIL_SEND_EMAILS, \
     PROJECT_STORIES_SEND_EMAILS, PROJECT_STORIES_REPLY_TO, PROJECT_STORIES_SUBJECT, PROJECT_STORIES_FORM_URL, \
-    PROJECT_STORIES_PUBLIC_URL, PROJECT_STORIES_OPT_OUT_KEY, FLASK_SECRET_KEY
+    PROJECT_STORIES_FROM_NAME, PROJECT_STORIES_PUBLIC_URL, PROJECT_STORIES_OPT_OUT_KEY, FLASK_SECRET_KEY
 from ..services.error_handlers import CustomError
 # from ..services.extensions import mail, Message
 from application.services.tools import decrypt_identifiers
@@ -609,6 +609,9 @@ def project_story_fn(request: Request) -> Response:
     member_id = request_data.get("member_id")
     resource = request_data.get("resource")
     used_on = request_data.get("used_on")
+    # the scheduler maps the machine to a category; an older scheduler or an unmapped machine gets the fallback
+    na_stroji = request_data.get("na_stroji") or "na jednom ze strojů"
+    on_machine = request_data.get("on_machine") or "on one of our machines"
 
     if not member_id or not resource or not used_on:
         raise ValueError("Missing member_id, resource or used_on")
@@ -637,11 +640,13 @@ def project_story_fn(request: Request) -> Response:
     # <<<---------------------- EMAIL: PROJECT STORY ---------------------->>>
     send_email(
         [member_data["emailAddress"]],
-        PROJECT_STORIES_SUBJECT.replace("{resource}", resource),
+        PROJECT_STORIES_SUBJECT.replace("{na_stroji}", na_stroji).replace("{resource}", resource),
         "project_story",
         merge_vars={
             "FIRST_NAME": member_data.get("firstName") or "",
             "RESOURCE": resource,
+            "NA_STROJI": na_stroji,
+            "ON_MACHINE": on_machine,
             "USED_ON": used_on,
             "DURATION_MINUTES": str(request_data.get("duration_minutes") or ""),
             "FORM_URL": form_url,
@@ -649,7 +654,7 @@ def project_story_fn(request: Request) -> Response:
                            f'?member={member_id}&sig={project_story_opt_out_signature(member_id)}'
         },
         reply_to=PROJECT_STORIES_REPLY_TO,
-        from_name="FabLab Brno"
+        from_name=PROJECT_STORIES_FROM_NAME
     )
 
     return Response("", 200)
@@ -800,7 +805,8 @@ def opt_out_page(title: str, text: str, button: bool = False) -> str:
 <style>body{{font-family:Montserrat,Helvetica,Arial,sans-serif;max-width:560px;margin:48px auto;padding:0 16px;
 color:#000;line-height:1.5}}h1{{font-size:20px}}button{{background:#E4032E;color:#fff;border:0;padding:12px 24px;
 font:bold 16px Montserrat,Helvetica,Arial,sans-serif;cursor:pointer}}</style></head>
-<body><h1>{title}</h1>{text}{form}</body></html>'''
+<body><img src="https://storage.googleapis.com/fablabbrno68049/FabLabBrno_Logo_H_Red.png" alt="FabLab Brno"
+width="200"><h1>{title}</h1>{text}{form}</body></html>'''
 
 
 def project_story_opt_out_fn(request: Request) -> Response:
@@ -819,8 +825,8 @@ def project_story_opt_out_fn(request: Request) -> Response:
     if request.method == "GET":
         return Response(opt_out_page(
             "Nechceš dostávat dotazy na projekty?",
-            "<p>Přestaneme ti posílat e-maily „Na čem právě pracuješ?“. Ostatní e-maily z FabLabu ti chodit budou dál.</p>"
-            "<p>We will stop sending you the “What are you working on?” emails. "
+            "<p>Přestaneme se tě ptát na projekty pro Made in FabLab. Ostatní e-maily z FabLabu ti chodit budou dál.</p>"
+            "<p>We will stop asking about your projects for Made in FabLab. "
             "Other FabLab emails stay as they are.</p>", button=True), 200, mimetype="text/html")
 
     try:
