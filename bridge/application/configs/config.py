@@ -43,6 +43,10 @@ ECOMAIL_SEND_EMAILS = str(os.getenv("ECOMAIL_SEND_EMAILS", True)).lower() in ["1
 # A switch of its own, so the question can be stopped without touching other emails.
 PROJECT_STORIES_SEND_EMAILS = str(os.getenv("PROJECT_STORIES_SEND_EMAILS", "false")).lower() in ["1", "true"]
 PROJECT_STORIES_REPLY_TO = os.getenv("PROJECT_STORIES_REPLY_TO")
-PROJECT_STORIES_SUBJECT = os.getenv("PROJECT_STORIES_SUBJECT", "Co vzniklo na stroji {resource}?")
+PROJECT_STORIES_SUBJECT = os.getenv("PROJECT_STORIES_SUBJECT", "Na čem právě pracuješ?")
 # {email}, {member_id}, {resource} and {date} are replaced (URL-encoded) - use a Google Forms pre-filled link.
 PROJECT_STORIES_FORM_URL = os.getenv("PROJECT_STORIES_FORM_URL", "https://forms.gle/RzqUZWeHa14mCwMt5")
+# Base of the opt-out link in the email - the bridge's own public address.
+PROJECT_STORIES_PUBLIC_URL = os.getenv("PROJECT_STORIES_PUBLIC_URL") or f'https://{os.getenv("RAILWAY_PUBLIC_DOMAIN")}'
+# Fabman member metadata flag: the member clicked the opt-out link, the scheduler never asks again.
+PROJECT_STORIES_OPT_OUT_KEY = "project_stories_opt_out"

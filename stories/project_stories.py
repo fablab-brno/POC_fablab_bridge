@@ -28,6 +28,8 @@ LOOKBACK_HOURS = int(os.getenv("PROJECT_STORIES_LOOKBACK_HOURS", "24"))
 DRY_RUN = str(os.getenv("PROJECT_STORIES_DRY_RUN", "true")).lower() in ["1", "true"]
 
 METADATA_KEY = "project_story_asked_at"
+# set by the bridge when the member clicks the opt-out link in the email
+OPT_OUT_KEY = "project_stories_opt_out"
 PRAGUE = ZoneInfo("Europe/Prague")
 PAGE_SIZE = 1000
 
@@ -113,6 +115,9 @@ def recently_asked(member: Dict, now: datetime) -> bool:
 
 
 def excluded(member: Dict) -> bool:
+    if (member.get("metadata") or {}).get(OPT_OUT_KEY):
+        return True
+
     return str(member["id"]) in EXCLUDE_MEMBERS or (member.get("emailAddress") or "").lower() in EXCLUDE_MEMBERS
 
 
@@ -204,7 +209,7 @@ def check_project_stories():
         resource_name = resources[lg["resource"]]
 
         if excluded(member):
-            print(f'member {member_id} skip - in PROJECT_STORIES_EXCLUDE_MEMBERS')
+            print(f'member {member_id} skip - opted out')
             continue
 
         if recently_asked(member, now):

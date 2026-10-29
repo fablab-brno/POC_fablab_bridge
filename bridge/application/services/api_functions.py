@@ -6,12 +6,15 @@ import base64
 from datetime import datetime
 from cryptography.fernet import Fernet
 import os
+import traceback
 from urllib.parse import quote
 
 from typing import Dict, List, Union, Tuple, Optional
 from application.services.tools import get_current_training_with_index, get_member_training, expired_date
 from application.configs.config import CLASSMARKER_WEBHOOK_SECRET, FABMAN_API_KEY, MAX_COURSE_ATTEMPTS, FERNET_KEY,\
-    CRONJOB_TOKEN, MAIL_USERNAME, ECOMAIL_API_KEY, VERIFY_CLASSMARKER_REQUESTS, ECOMAIL_MAIL_TEMPLATES, ECOMAIL_SEND_EMAILS,     PROJECT_STORIES_SEND_EMAILS, PROJECT_STORIES_REPLY_TO, PROJECT_STORIES_SUBJECT, PROJECT_STORIES_FORM_URL
+    CRONJOB_TOKEN, MAIL_USERNAME, ECOMAIL_API_KEY, VERIFY_CLASSMARKER_REQUESTS, ECOMAIL_MAIL_TEMPLATES, ECOMAIL_SEND_EMAILS, \
+    PROJECT_STORIES_SEND_EMAILS, PROJECT_STORIES_REPLY_TO, PROJECT_STORIES_SUBJECT, PROJECT_STORIES_FORM_URL, \
+    PROJECT_STORIES_PUBLIC_URL, PROJECT_STORIES_OPT_OUT_KEY, FLASK_SECRET_KEY
 from ..services.error_handlers import CustomError
 # from ..services.extensions import mail, Message
 from application.services.tools import decrypt_identifiers
@@ -641,7 +644,9 @@ def project_story_fn(request: Request) -> Response:
             "RESOURCE": resource,
             "USED_ON": used_on,
             "DURATION_MINUTES": str(request_data.get("duration_minutes") or ""),
-            "FORM_URL": form_url
+            "FORM_URL": form_url,
+            "OPT_OUT_URL": f'{PROJECT_STORIES_PUBLIC_URL.rstrip("/")}/project-story/opt-out'
+                           f'?member={member_id}&sig={project_story_opt_out_signature(member_id)}'
         },
         reply_to=PROJECT_STORIES_REPLY_TO,
         from_name="FabLab Brno"
@@ -777,3 +782,71 @@ def get_training_links_fn(request: Request) -> Response:
     request_data = request.json
 
     return jsonify(get_training_links(request_data, FABMAN_API_KEY))
+
+
+def project_story_opt_out_signature(member_id) -> str:
+    """
+    Signs the opt-out link, so nobody can switch the emails off for someone else by changing the member id.
+    """
+    return hmac.new(FLASK_SECRET_KEY.encode(), f'project-story-opt-out:{member_id}'.encode(),
+                    hashlib.sha256).hexdigest()[:32]
+
+
+def opt_out_page(title: str, text: str, button: bool = False) -> str:
+    form = '<form method="post"><button type="submit">Odhlásit / Unsubscribe</button></form>' if button else ""
+
+    return f'''<!doctype html><html lang="cs"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>FabLab Brno</title>
+<style>body{{font-family:Montserrat,Helvetica,Arial,sans-serif;max-width:560px;margin:48px auto;padding:0 16px;
+color:#000;line-height:1.5}}h1{{font-size:20px}}button{{background:#E4032E;color:#fff;border:0;padding:12px 24px;
+font:bold 16px Montserrat,Helvetica,Arial,sans-serif;cursor:pointer}}</style></head>
+<body><h1>{title}</h1>{text}{form}</body></html>'''
+
+
+def project_story_opt_out_fn(request: Request) -> Response:
+    """
+    Opt-out link from the project story email. GET only asks (mail scanners open links), POST switches it off.
+    Only these emails stop - the member stays on every other FabLab list.
+    """
+    member_id = request.args.get("member", "")
+
+    if not member_id.isdigit() or not hmac.compare_digest(request.args.get("sig", ""),
+                                                          project_story_opt_out_signature(member_id)):
+        return Response(opt_out_page("Odkaz nefunguje / Link not valid",
+                                     "<p>Napiš nám prosím odpovědí na e-mail. / Please reply to the email instead.</p>"),
+                        400, mimetype="text/html")
+
+    if request.method == "GET":
+        return Response(opt_out_page(
+            "Nechceš dostávat dotazy na projekty?",
+            "<p>Přestaneme ti posílat e-maily „Na čem právě pracuješ?“. Ostatní e-maily z FabLabu ti chodit budou dál.</p>"
+            "<p>We will stop sending you the “What are you working on?” emails. "
+            "Other FabLab emails stay as they are.</p>", button=True), 200, mimetype="text/html")
+
+    try:
+        member_data = data_from_get_request(f'https://fabman.io/api/v1/members/{member_id}', FABMAN_API_KEY)
+        metadata = dict(member_data.get("metadata") or {})
+        metadata[PROJECT_STORIES_OPT_OUT_KEY] = datetime.utcnow().isoformat() + "Z"
+
+        res = requests.put(
+            f'https://fabman.io/api/v1/members/{member_id}',
+            json={"lockVersion": member_data["lockVersion"], "metadata": metadata},
+            headers={"Authorization": f'{FABMAN_API_KEY}'}
+        )
+
+        if res.status_code != 200:
+            raise CustomError("Error during project story opt-out", f'{member_id}, {res.status_code}')
+
+    except Exception:
+        print(traceback.format_exc())
+
+        return Response(opt_out_page("Něco se pokazilo / Something went wrong",
+                                     "<p>Zkus to prosím znovu, nebo odpověz na e-mail. / "
+                                     "Please try again, or reply to the email.</p>"),
+                        500, mimetype="text/html")
+
+    print(f'PROJECT STORY opt-out - member {member_id}')
+
+    return Response(opt_out_page("Hotovo / Done",
+                                 "<p>Dotazy na projekty ti už posílat nebudeme. / "
+                                 "We won’t ask about your projects again.</p>"), 200, mimetype="text/html")

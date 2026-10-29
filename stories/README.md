@@ -6,7 +6,9 @@ Every run reads finished machine sessions from Fabman (`/resource-logs`) and pic
 watched machine lasted at least `PROJECT_STORIES_MIN_MINUTES` (idle time left out). Each of them gets one email
 through the bridge (`POST /project-story`) about their longest recent session, at most once per
 `PROJECT_STORIES_COOLDOWN_DAYS`. The date of the last question is kept in the member's Fabman metadata
-(`project_story_asked_at`), so the scheduler needs no database and a re-run never asks twice.
+(`project_story_asked_at`), so the scheduler needs no database and a re-run never asks twice. The email carries
+a signed opt-out link (`/project-story/opt-out` on the bridge); a click sets `project_stories_opt_out` in the same
+metadata and the member is never asked again. Newsletters and other FabLab emails are not touched.
 
 The email is an Ecomail transactional template with a link to a Google Form and reply-to set to a person,
 so members can either fill the form or just answer the email.
@@ -52,7 +54,8 @@ Bridge:
 * ECOMAIL_TEMPLATE_ID_PROJECT_STORY: Ecomail transactional template
 * PROJECT_STORIES_SEND_EMAILS: (boolean) default `false` - the bridge answers 503 and sends nothing
 * PROJECT_STORIES_REPLY_TO: where replies go
-* PROJECT_STORIES_SUBJECT: default `Co vzniklo na stroji {resource}?`
+* PROJECT_STORIES_SUBJECT: default `Na čem právě pracuješ?` (`{resource}` is replaced)
 * PROJECT_STORIES_FORM_URL: Google Forms pre-filled link; `{email}`, `{member_id}`, `{resource}` and `{date}` are replaced
+* PROJECT_STORIES_PUBLIC_URL: base of the opt-out link, default `https://$RAILWAY_PUBLIC_DOMAIN`
 
-Template merge tags: `*|FIRST_NAME|*`, `*|RESOURCE|*`, `*|USED_ON|*`, `*|DURATION_MINUTES|*`, `*|FORM_URL|*`.
+Template merge tags: `*|FIRST_NAME|*`, `*|RESOURCE|*`, `*|USED_ON|*`, `*|DURATION_MINUTES|*`, `*|FORM_URL|*`, `*|OPT_OUT_URL|*`.

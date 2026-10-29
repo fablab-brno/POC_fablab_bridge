@@ -6,7 +6,8 @@ from . import main
 from ..services.error_handlers import error_handler
 from ..services.api_functions import (get_list_of_available_trainings_fn, get_training_links_fn, \
                                       add_classmarker_training_fn, training_expiration_fn, get_list_of_absolved_trainings_fn, locked_bookings_fn, \
-                                      absolve_training_again_fn, handle_member_create_event, project_story_fn)
+                                      absolve_training_again_fn, handle_member_create_event, project_story_fn, \
+                                      project_story_opt_out_fn)
 # , activities_notifications_fn)
 from ..services.extensions import swag_from
 from ..services.auth import require_web_auth, require_fabman_webhook_key
@@ -104,6 +105,14 @@ def project_story():
     Ask member about the project made on a machine
     """
     return project_story_fn(request)
+
+
+@main.route("/project-story/opt-out", methods=["GET", "POST"])
+def project_story_opt_out():
+    """
+    Opt-out link from the project story email (a page for the member, so no error_handler JSON)
+    """
+    return project_story_opt_out_fn(request)
 
 
 @main.route("/assign-member-gender", methods=["POST"])
