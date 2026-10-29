@@ -620,7 +620,16 @@ def project_story_fn(request: Request) -> Response:
     if not member_data.get("emailAddress"):
         raise CustomError("Member has no email address", member_id)
 
-    form_url = PROJECT_STORIES_FORM_URL         .replace("{member_id}", quote(str(member_id)))         .replace("{resource}", quote(resource))         .replace("{date}", quote(used_on))
+    form_url = PROJECT_STORIES_FORM_URL
+    placeholders = {
+        "{email}": member_data["emailAddress"],
+        "{member_id}": str(member_id),
+        "{resource}": resource,
+        "{date}": used_on
+    }
+
+    for placeholder, value in placeholders.items():
+        form_url = form_url.replace(placeholder, quote(value))
 
     # <<<---------------------- EMAIL: PROJECT STORY ---------------------->>>
     send_email(

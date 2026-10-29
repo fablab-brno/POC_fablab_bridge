@@ -52,6 +52,6 @@ Bridge:
 * PROJECT_STORIES_SEND_EMAILS: (boolean) default `false` - the bridge answers 503 and sends nothing
 * PROJECT_STORIES_REPLY_TO: where replies go
 * PROJECT_STORIES_SUBJECT: default `Co vzniklo na stroji {resource}?`
-* PROJECT_STORIES_FORM_URL: Google Forms pre-filled link; `{member_id}`, `{resource}` and `{date}` are replaced
+* PROJECT_STORIES_FORM_URL: Google Forms pre-filled link; `{email}`, `{member_id}`, `{resource}` and `{date}` are replaced
 
 Template merge tags: `*|FIRST_NAME|*`, `*|RESOURCE|*`, `*|USED_ON|*`, `*|DURATION_MINUTES|*`, `*|FORM_URL|*`.

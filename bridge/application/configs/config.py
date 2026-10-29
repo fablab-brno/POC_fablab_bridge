@@ -44,5 +44,5 @@ ECOMAIL_SEND_EMAILS = str(os.getenv("ECOMAIL_SEND_EMAILS", True)).lower() in ["1
 PROJECT_STORIES_SEND_EMAILS = str(os.getenv("PROJECT_STORIES_SEND_EMAILS", "false")).lower() in ["1", "true"]
 PROJECT_STORIES_REPLY_TO = os.getenv("PROJECT_STORIES_REPLY_TO")
 PROJECT_STORIES_SUBJECT = os.getenv("PROJECT_STORIES_SUBJECT", "Co vzniklo na stroji {resource}?")
-# {member_id}, {resource} and {date} are replaced (URL-encoded) - use a Google Forms pre-filled link.
+# {email}, {member_id}, {resource} and {date} are replaced (URL-encoded) - use a Google Forms pre-filled link.
 PROJECT_STORIES_FORM_URL = os.getenv("PROJECT_STORIES_FORM_URL", "https://forms.gle/RzqUZWeHa14mCwMt5")
