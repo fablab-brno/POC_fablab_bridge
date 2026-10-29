@@ -19,7 +19,8 @@ def env_ids(name: str) -> List[int]:
 
 RESOURCES = env_ids("PROJECT_STORIES_RESOURCES")
 RESOURCE_TYPES = env_ids("PROJECT_STORIES_RESOURCE_TYPES")
-EXCLUDE_MEMBERS = env_ids("PROJECT_STORIES_EXCLUDE_MEMBERS")
+# member ids or e-mail addresses - people who asked to stop getting these e-mails, staff
+EXCLUDE_MEMBERS = [i.lower() for i in os.getenv("PROJECT_STORIES_EXCLUDE_MEMBERS", "").replace(" ", "").split(",") if i]
 MIN_MINUTES = int(os.getenv("PROJECT_STORIES_MIN_MINUTES", "20"))
 COOLDOWN_DAYS = int(os.getenv("PROJECT_STORIES_COOLDOWN_DAYS", "30"))
 LOOKBACK_HOURS = int(os.getenv("PROJECT_STORIES_LOOKBACK_HOURS", "24"))
@@ -111,6 +112,10 @@ def recently_asked(member: Dict, now: datetime) -> bool:
     return bool(asked_at) and parse_dt(asked_at) > now - timedelta(days=COOLDOWN_DAYS)
 
 
+def excluded(member: Dict) -> bool:
+    return str(member["id"]) in EXCLUDE_MEMBERS or (member.get("emailAddress") or "").lower() in EXCLUDE_MEMBERS
+
+
 def mark_asked(member: Dict, now: datetime) -> None:
     metadata = dict(member.get("metadata") or {})
     metadata[METADATA_KEY] = now.isoformat()
@@ -187,9 +192,6 @@ def check_project_stories():
         if parse_dt(lg["stoppedAt"]) < since or active_minutes(lg) < MIN_MINUTES:
             continue
 
-        if lg["member"] in EXCLUDE_MEMBERS:
-            continue
-
         best = candidates.get(lg["member"])
 
         if not best or active_minutes(lg) > active_minutes(best):
@@ -200,6 +202,10 @@ def check_project_stories():
     for member_id, lg in candidates.items():
         member = fabman_get(f'/members/{member_id}')
         resource_name = resources[lg["resource"]]
+
+        if excluded(member):
+            print(f'member {member_id} skip - in PROJECT_STORIES_EXCLUDE_MEMBERS')
+            continue
 
         if recently_asked(member, now):
             print(f'member {member_id} skip - asked in the last {COOLDOWN_DAYS} days')

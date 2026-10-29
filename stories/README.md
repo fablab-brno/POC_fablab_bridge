@@ -40,7 +40,8 @@ Scheduler (this service):
 * SCHEDULED_TASK: `project_stories` (default) or `list_resources`
 * PROJECT_STORIES_RESOURCE_TYPES: comma separated Fabman resource type ids (e.g. all 3D printers)
 * PROJECT_STORIES_RESOURCES: comma separated Fabman resource ids
-* PROJECT_STORIES_EXCLUDE_MEMBERS: comma separated member ids never asked (staff, people who said no)
+* PROJECT_STORIES_EXCLUDE_MEMBERS: comma separated member ids or e-mail addresses never asked (staff, people who
+  replied they don't want these e-mails - they stay on the FabLab newsletters)
 * PROJECT_STORIES_MIN_MINUTES: minimal active session length, default 20
 * PROJECT_STORIES_COOLDOWN_DAYS: default 30
 * PROJECT_STORIES_LOOKBACK_HOURS: how old a finished session may be, default 24
